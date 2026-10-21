@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visual-defect-detection"
+version = "0.1.0"
+description = "Normal-only visual inspection with an autoencoder and pretrained CNN ensemble"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = ["torch>=2.5,<3", "torchvision>=0.20,<1", "numpy>=1.26,<3", "Pillow>=10,<13", "scikit-learn>=1.4,<2"]
+
+[project.optional-dependencies]
+demo = ["streamlit>=1.40,<2"]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[project.scripts]
+vdd = "vdd.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

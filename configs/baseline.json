@@ -1,0 +1,11 @@
+{
+  "note": "Reference values only; the CLI does not read this file. Pass flags to change settings.",
+  "image_size": 128,
+  "epochs": 10,
+  "batch_size": 16,
+  "seed": 42,
+  "validation_fraction": 0.2,
+  "autoencoder_weight": 0.5,
+  "normal_threshold_quantile": 0.95,
+  "device": "cpu"
+}
