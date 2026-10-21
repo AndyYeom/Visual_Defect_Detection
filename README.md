@@ -106,6 +106,8 @@ reports/                Local evaluation output (ignored)
 
 ## Checks
 
+See [initial validation record](docs/VALIDATION.md) for the checks actually completed and remaining validation.
+
 ```bash
 ruff check .
 pytest -q
