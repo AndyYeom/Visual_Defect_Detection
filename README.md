@@ -8,7 +8,7 @@ Research prototype that learns normal product appearance, flags unusual images, 
 
 **Status: initial implementation, not a trained or validated inspection system.** The proposal leaves the dataset open. This scaffold supports MVTec AD-style folders and suggests MVTec AD as a first candidate, subject to the team's dataset review. No real-data results or trained weights are included.
 
-[한국어 시작 안내](docs/QUICKSTART_KO.md) · [Dataset plan](docs/DATASET.md) · [Evaluation protocol](docs/EVALUATION.md) · [Project plan](docs/PROJECT_PLAN.md)
+[Dataset plan](docs/DATASET.md) · [Evaluation protocol](docs/EVALUATION.md) · [Project plan](docs/PROJECT_PLAN.md)
 
 ## Scope
 
