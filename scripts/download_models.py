@@ -3,10 +3,13 @@ import argparse
 import hashlib
 import json
 import shutil
+import ssl
 import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+
+import certifi
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,7 +34,9 @@ def main():
             archive=temporary/'models.zip'
             print('Downloading trained models. This may take a few minutes.',flush=True)
             request=urllib.request.Request(spec['url'],headers={'User-Agent':'Group30-Visual-Defect-Detection'})
-            with urllib.request.urlopen(request,timeout=180) as response,archive.open('wb') as target:
+            context = ssl.create_default_context()
+            context.load_verify_locations(cafile=certifi.where())
+            with urllib.request.urlopen(request,timeout=180,context=context) as response,archive.open('wb') as target:
                 shutil.copyfileobj(response,target)
         if digest(archive)!=spec['sha256']:
             raise ValueError('Archive checksum mismatch. Download the release asset again.')
