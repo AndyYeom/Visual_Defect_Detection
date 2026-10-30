@@ -1,4 +1,4 @@
-# InspectIQ — Visual Defect Detection
+# InspectIQ — AI Visual Defect Detection
 
 **NUS-ISS · Pattern Recognition Systems Practice Module · Group 30**
 
