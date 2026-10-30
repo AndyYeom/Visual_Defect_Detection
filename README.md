@@ -72,6 +72,8 @@ The data directory should contain `bottle/train/good`, `bottle/test`, etc. Examp
 
 ![Demo inspection screen](docs/demo.png)
 
+![Anomaly localization result](docs/result.png)
+
 ## Experimental results
 
 Results are **macro averages across 15 categories**, from the completed `full15_224_v1` experiment:
