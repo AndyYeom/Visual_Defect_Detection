@@ -21,14 +21,15 @@ def main():
     shared = None
     manifest = {'schema_version':1,'method':'patchcore','categories':{},'files':{}}
     for category in summary['complete_categories']:
-        if category == 'bottle':
+        reused = category == 'bottle' and (run/category/'reused_from.json').is_file()
+        if reused:
             old=Path(json.loads((run/category/'reused_from.json').read_text())['path'])
             folder=old/'patchcore'
         else:
             stage=run/category/'patchcore'
             folder=stage/json.loads((stage/'complete.json').read_text())['attempt']
         checkpoint = folder/'model.pt'
-        if not checkpoint.exists() and args.local_root and category != 'bottle':
+        if not checkpoint.exists() and args.local_root and not reused:
             checkpoint = args.local_root/category/'patchcore'/folder.name/'model.pt'
             receipt = json.loads((stage/'complete.json').read_text())
             assert hashlib.sha256(checkpoint.read_bytes()).hexdigest() == receipt['files']['model.pt']

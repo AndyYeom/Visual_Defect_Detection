@@ -21,6 +21,28 @@ After evaluating six methods across all **15 MVTec AD categories**, we selected 
 
 The frontend and inference backend are delivered together in one Streamlit application. A separate web/API server is not required.
 
+## Our contributions
+
+Our contribution is the implementation and evaluation of an inspection workflow using established research methods:
+
+- A shared normal-only split and calibration protocol for six methods across 15 categories.
+- Category-level and macro performance comparisons, pixel metrics and explicit failure analysis.
+- Evidence-based selection of PatchCore rather than assuming score ensembles improve performance.
+- A checksum-verified model package and an offline-capable Streamlit application with downloadable inspection results.
+- A reproducible experiment runner with saved manifests, logs and verified stage-level resume.
+
+We do not claim to have invented PatchCore or DINOv2, or to reproduce published SOTA scores exactly.
+
+## Final deliverables
+
+- [Final report (Word)](submission/InspectIQ-Final-Report.docx)
+- [Submission presentation (PowerPoint, no speaker notes)](submission/InspectIQ-Final-Presentation.pptx)
+- [Measured results and evaluation protocol](docs/EVALUATION.md)
+- [Runnable demo models](https://github.com/AndyYeom/Visual_Defect_Detection/releases)
+- [Full experiment reproduction instructions](docs/REPRODUCIBILITY.md)
+
+The live demonstration is launched with the quick start below. A recorded demo video is not included in this repository.
+
 ## Quick start
 
 Use **Python 3.12** and run these commands in a terminal:
@@ -93,7 +115,13 @@ Protocol: 224 × 224 inputs; normal training images split 80/20 for training/val
 
 These are our adapted experimental implementations, not claims to reproduce published SOTA numbers. The DINO baseline uses DINOv2 ViT-S/14 without foreground masking or rotation augmentation. False positives remain substantial in some categories; deployment on new cameras, lighting, or products requires representative validation and human review. Test labels must not be used to tune the demo threshold.
 
-![Macro image AUROC comparison](docs/results/image_auroc.png)
+![Image AUROC by category and method](docs/results/image_auroc.png)
+
+### Why PatchCore?
+
+PatchCore achieved the highest macro image AUROC and F1 in our comparison. Fixed fusion did not improve the stronger component: AE + CNN scored 0.8197 AUROC versus CNN's 0.8588; AE + DINO scored 0.9464 versus DINO's 0.9679. These findings support the selected model for this experiment, not a universal claim about ensembles.
+
+The selected model still produced 59 false alarms and 73 missed defects across the pooled test set. Capsule, pill and screw accounted for 65 of those misses. These pooled counts complement the category-averaged metrics above. The demo therefore supports inspection and human review, rather than guaranteeing defect-free production.
 
 ## Repository contents
 
@@ -120,6 +148,8 @@ python -m vdd.benchmark --help
 python -m vdd.suite --help
 ```
 
+For exact fresh-run, resume, Colab and export commands, see [Reproducing the experiments](docs/REPRODUCIBILITY.md). No previous team experiment is required.
+
 Training requires downloading pretrained feature extractors on first use. The released demo models do not. Existing run directories are retained for traceability; do not combine incompatible experiment protocols when resuming.
 
 ## References and attribution
@@ -127,5 +157,6 @@ Training requires downloading pretrained feature extractors on first use. The re
 - Roth et al., *Towards Total Recall in Industrial Anomaly Detection*, CVPR 2022 — [PatchCore paper and authors' implementation](https://github.com/amazon-science/patchcore-inspection).
 - Bergmann et al., *MVTec AD — A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection*, CVPR 2019 — [official dataset](https://www.mvtec.com/company/research/datasets/mvtec-ad).
 - [Anomalib](https://github.com/open-edge-platform/anomalib): PatchCore model implementation used in this project (version 2.7.0).
+- Damm et al., *AnomalyDINO: Boosting Patch-Based Few-Shot Anomaly Detection with DINOv2*, WACV 2025 — [paper](https://arxiv.org/abs/2405.14529). Our DINO comparison uses the available normal training split rather than the paper's few-shot protocol and omits foreground masking and rotation augmentation.
 - [DINOv2](https://github.com/facebookresearch/dinov2): pretrained visual representation used for the DINO comparison.
 - [PyTorch](https://pytorch.org/) and [Streamlit](https://streamlit.io/): model inference and interactive application.

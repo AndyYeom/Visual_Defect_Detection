@@ -4,4 +4,4 @@ Create a branch for each change and open a pull request. Run `ruff check .` and 
 
 For experiments, preserve the split manifest, configuration, environment, checkpoint and measured outputs locally. Add concise aggregate findings only after a real evaluation. Keep test data untouched during parameter choice. Do not commit datasets, model files, credentials, original student records or review logs.
 
-Agree task ownership and code licensing as a team. This draft does not assign members to tasks or claim results.
+Agree task ownership and code licensing as a team. Preserve the published experiment results; record new experiments separately and distinguish research methods from project-specific contributions.

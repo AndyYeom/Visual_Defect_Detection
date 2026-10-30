@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +16,7 @@ from vdd.suite import CATEGORIES, METHODS
 
 
 def stage_path(run, category, stage):
-    if category == 'bottle':
+    if category == 'bottle' and (run / category / 'reused_from.json').is_file():
         old = Path(json.loads((run / category / 'reused_from.json').read_text())['path'])
         return old / ('baseline/report' if stage == 'baseline_evaluate' else stage)
     folder = run / category / stage

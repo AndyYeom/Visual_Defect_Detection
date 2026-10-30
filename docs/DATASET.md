@@ -1,35 +1,28 @@
-# Dataset selection and preparation
+# Dataset: MVTec AD
 
-The proposal does not select a dataset. First candidate: [MVTec AD](https://www.mvtec.com/research-teaching/datasets/mvtec-ad). Review the current provider terms, category counts, defects, mask quality and download size before selection. Download manually from the official provider; this repo does not redistribute data.
+The final project uses the original **MVTec AD** dataset, not MVTec AD 2. Obtain it from the [official provider](https://www.mvtec.com/company/research/datasets/mvtec-ad) and follow the provider's dataset terms. Images are not redistributed in this repository.
 
-## Expected layout
+## Coverage
+
+The experiment covers all 15 categories: bottle, cable, capsule, carpet, grid, hazelnut, leather, metal_nut, pill, screw, tile, toothbrush, transistor, wood and zipper. These include objects and textures, with normal training images and normal/defective test images. Defective test images have pixel-level ground-truth masks.
+
+The dataset contains 3,629 official training images and 1,725 test images (467 normal and 1,258 anomalous). Our seed-42 category-wise split uses 2,903 normal images for fitting and 726 for validation. Test images and masks are used only for evaluation, never threshold fitting or model selection within a run.
+
+## Directory layout
 
 ```text
-data/mvtec_ad/
+mvtec_anomaly_detection/
   bottle/
     train/good/*.png
     test/good/*.png
     test/broken_large/*.png
-    test/other_defect/*.png
     ground_truth/broken_large/*_mask.png
+  cable/
+  ...
 ```
 
-The loader ignores ground-truth masks for the initial image-level baseline. Non-`good` test folders are labelled anomalous. Each run covers one category. RGB conversion and square resize are applied consistently; no random augmentation is enabled initially. Record any loss of fine detail caused by resizing.
+Pass the directory containing the 15 category folders as `--root`. Keep original folder names. Images are resized to 224 x 224 for the final comparison. Use a local working disk for training and a separate persistent folder for experiment outputs. No dataset is needed to inspect an uploaded image with the released demo models.
 
-## Split contract
+## Evaluation integrity
 
-`vdd prepare` takes 20% of `train/good` for normal-only validation with seed 42. Remaining normal images form training. Existing test folders remain held out. All records carry content hashes; duplicates anywhere in the selected category are rejected. Changed images require rebuilding and reviewing the manifest. Manifests use relative paths so the dataset root can move without changing splits.
-
-Exact-byte duplicate checks cannot detect near-duplicates or images of the same item taken in a sequence. Inspect provenance and group related captures before assigning splits for custom datasets. Do not put images from the same physical item into train and test. The current CLI expects a pre-separated MVTec-style layout; custom group splitting needs a reviewed adapter.
-
-The minimum accepted number of normal images is only a software guard, not a scientifically sufficient sample size. Aim for the proposal's few hundred normals where feasible and report actual counts per split and category. A 95th-percentile threshold is unstable on a small validation set.
-
-## Selection record
-
-- Dataset/version and original source:
-- Terms reviewed and intended academic use:
-- Categories and why they fit the deadline:
-- Normal/defect counts by split:
-- Annotation coverage and quality:
-- Duplicate or related-capture audit:
-- Final selection date and reviewer:
+Split manifests preserve image membership across all six methods. Validation uses only normal samples; the 95th percentile sets the image threshold. Defect types, test labels and masks support image metrics, pixel metrics and post-evaluation error analysis. Error analysis describes failure modes; it does not retroactively tune the reported experiment. See [evaluation protocol](EVALUATION.md).

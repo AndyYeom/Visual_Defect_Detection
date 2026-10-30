@@ -1,17 +1,25 @@
-# Architecture and decisions
+# System architecture
 
-The CLI and Streamlit app share the Detector class. Training serializes both model state dictionaries, normal feature statistics and all score calibration into a single checkpoint. Loading uses PyTorch's weights-only mode and reconstructs the CNN without a network download. Use checkpoints produced by the team.
+InspectIQ separates offline experimentation from a lightweight Streamlit inspection app. The final deployed method is PatchCore; the autoencoder, frozen CNN and DINO-based methods remain comparison baselines.
 
-## Methods
+## Offline experiment pipeline
 
-The autoencoder has three downsampling convolutions and three transposed-convolution decoding stages. It learns RGB reconstruction with mean squared error. Its map is mean squared channel error.
+1. `data.py` creates deterministic category manifests: normal training/validation splits and the official test set.
+2. `pipeline.py` trains the autoencoder and fits the frozen ResNet-18 feature baseline. `benchmark.py` fits PatchCore and the DINOv2 patch-feature detector and evaluates fixed score ensembles.
+3. `suite.py` runs all six methods at 224px across 15 categories. It saves logs, manifests, checkpoints, metrics, predictions and SHA-256 receipts to a persistent result directory. Completed stages are reused only after checksum verification; an interrupted stage restarts.
+4. `notebooks/analyze_suite.py` produces the category AUROC comparison, error table and hard-case heatmaps after all 15 categories complete.
+5. `scripts/export_patchcore.py` packages evaluated category memory banks and one shared frozen backbone. Export does not retrain models or change thresholds.
 
-The feature baseline freezes ImageNet ResNet18 through layer2, normalizes inputs with the documented ImageNet mean/std, and estimates one mean and diagonal variance per spatial location/channel from training images. A variance floor avoids division by zero. Distance averages squared standardized feature deviations across channels; bilinear interpolation returns an input-resolution map. This is a simple Gaussian feature baseline, not full-covariance PaDiM.
+The original experiment reused a verified earlier bottle run. Fresh runs now train bottle through the same stage pipeline as every other category. See [reproduction instructions](REPRODUCIBILITY.md).
 
-For each method, the average of the top 1% of map values produces the image score. Normal-validation mean/std standardization precedes weighted score averaging. Each baseline and the ensemble receives its own normal-validation quantile threshold. No scores are clipped to probabilities.
+## Inference application
 
-## Tradeoffs
+`app/streamlit_app.py` calls `PatchCoreDetector` in `src/vdd/patchcore_inference.py`. There is no separate API server. The installer and loader verify model checksums; the packaged backbone loads without internet access. CPU and NVIDIA CUDA are supported for the final demo.
 
-CPU-first execution and 128-pixel images make setup accessible. The frozen spatial feature model needs reasonably aligned images and may fail under pose or lighting changes. Small defects may disappear under resize. Variance estimates need enough normal images. GPU training, richer architectures, checkpoint resumption, pixel metrics and multi-user hosting are future work.
+The user selects a product category and uploads an image. The backend applies the saved 224px preprocessing, extracts patch features, compares them with that category's normal memory bank, and returns a score and anomaly map. The saved normal-validation threshold determines the verdict. The application displays the original image, heatmap, threshold and inference time.
 
-Streamlit is a local single-user demo. It writes the latest overlay and an append-only local review log. It is not designed as a shared production service.
+Inspection state is held in the Streamlit session. Users explicitly download an inspection JSON and overlay PNG; the app does not maintain an append-only review database. Heatmaps are normalized per image for visualization and are not calibrated segmentation masks.
+
+## Boundaries and limitations
+
+Dataset files, runtime results and downloaded weights are excluded from Git. Compact measured results and final submission documents are included. Models are distributed through a versioned GitHub release. The application assumes a known supported product category and representative images; it does not identify arbitrary objects. Human review, operating-threshold validation on new acquisition conditions, and production throughput assessment remain deployment work.

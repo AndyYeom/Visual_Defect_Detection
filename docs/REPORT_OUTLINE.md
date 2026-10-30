@@ -1,13 +1,15 @@
-# Final report outline
+# Final report structure
 
-1. Problem, manufacturing context and scope.
-2. Dataset choice, access terms, category counts, annotation coverage and split integrity.
-3. Autoencoder, pretrained feature method, score normalization and ensemble equations.
-4. Experimental setup, versions, hardware, seeds and frozen parameters.
-5. Measured comparison of all three methods and latency definitions.
-6. False-positive/false-negative analysis and heatmap examples.
-7. Prototype workflow, human review and demonstration.
-8. Limitations, learning outcomes, contributions and future work.
-9. Reproduction commands, references and artifact checksums.
+The completed report is linked from the README. The project narrative covers:
 
-Do not fill results with smoke-test values. Distinguish generated starter code, team modifications and evaluated findings according to module requirements.
+1. Industrial inspection problem and normal-only learning scope.
+2. MVTec AD coverage, masks and deterministic split integrity.
+3. Six methods: autoencoder, frozen CNN, AE + CNN, PatchCore, DINOv2-based detector and AE + DINO.
+4. Shared 224px protocol, calibration, seeds, hardware and implementation differences from papers.
+5. Category and macro image metrics, with pixel metrics where implemented.
+6. False alarms, missed defects and heatmap interpretation.
+7. PatchCore selection, packaged inference and Streamlit demonstration.
+8. Limitations, contributions and future work.
+9. Reproduction instructions and references.
+
+Reported values must come from the completed experiment, not synthetic smoke tests. Distinguish established research methods from the team's integration, evaluation and application work.
