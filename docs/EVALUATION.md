@@ -1,33 +1,51 @@
-# Evaluation protocol
+# Evaluation and deployment protocol
 
-## Freeze before opening the test results
+The final experiment compared six methods on all 15 MVTec AD categories. The selected demo model is PatchCore. Complete aggregate results and category-level results are included in the release model package as `experiment_summary.json` and `category_metrics.csv`.
 
-Use normal training images to optimize the autoencoder and estimate CNN means/variances. Use normal validation images only to standardize both image scores and determine each decision threshold. Fix the ensemble weight at 0.5 before evaluation. Do not optimize recall, AUROC or weights against the held-out defect images.
+## Split and calibration
 
-This first implementation uses a fixed epoch count. If adding early stopping or extensive model selection, reserve a separate normal calibration split; repeatedly selecting models on the same calibration set can overfit it. Do not use test labels to choose the dataset category or report only a favourable run.
+For each category, split official normal training images into 80% training and 20% validation with seed 42. Freeze the split manifest and use the same test images for all methods. Train on normal images only. Set each image decision threshold to the 95th percentile of normal validation scores. Classification uses `score > threshold`. Test labels and masks are used only for reporting metrics, not fitting thresholds or ensemble weights.
 
-## Metrics
+All inputs in the final comparison are 224 × 224. Earlier 128px baseline runs are exploratory and are not part of the final table. The completed bottle 224px run was reused with its recorded configuration; the other 14 categories were executed by the resumable suite.
 
-Report autoencoder, CNN and ensemble on the identical test manifest: image AUROC, precision, recall, F1 and false-positive rate. AUROC is null when only one class exists; it must not be reported as zero. Thresholded metrics use `score > threshold`. The confusion-matrix counts and false-alarm examples can be derived from predictions.csv and the saved thresholds.
+## Methods
 
-Record category, split counts/hash, image size, seed, epoch count, package versions and checkpoint. Compare per category; do not pool differently calibrated categories without a justified protocol. The baseline is not guaranteed to improve through ensembling.
+- Autoencoder: small convolutional reconstruction model, MSE score, 10 epochs, batch size 16.
+- CNN: frozen pretrained ResNet-18 layer2 features with a diagonal Gaussian distance baseline.
+- AE + CNN: fixed 50/50 fusion after normal-validation score standardization.
+- PatchCore: anomalib 2.7.0, pretrained Wide ResNet-50-2, layer2/layer3, 1% coreset, 9 neighbors.
+- DINO: DINOv2 ViT-S/14 patch features and nearest normal feature distances; full memory bank, no foreground mask or rotation augmentation.
+- AE + DINO: fixed 50/50 fusion calibrated using normal validation images.
 
-Latency is CPU-only in this scaffold. One test image warms the model, then each image is scored once. AE/CNN component times include scoring; ensemble_total includes RGB conversion, resize, both models and fusion, excludes disk I/O and model loading. Report hardware, thread count (2), mean and p95, and distinguish these measurements from throughput or production latency. Repeat timing measurements for final reporting.
+These are practical adaptations. The experiment is not an exact reproduction of published PatchCore or AnomalyDINO benchmark protocols.
 
-## Heatmap review
+## Final results
 
-Inspect representative normal images, detected anomalies, false positives and false negatives. Relative overlay colours cannot be compared quantitatively across images. The fused map uses image-score calibration for visualization and is not a learned segmentation mask. Pixel AUROC/PRO, mask alignment and localization thresholds remain unimplemented extensions.
+| Method | Macro image AUROC | Macro F1 |
+|---|---:|---:|
+| Autoencoder | 0.578116 | 0.271520 |
+| CNN | 0.858774 | 0.702750 |
+| AE + CNN | 0.819698 | 0.681846 |
+| PatchCore | 0.983951 | 0.951429 |
+| DINO | 0.967892 | 0.925787 |
+| AE + DINO | 0.946434 | 0.909142 |
 
-## Review feedback
+PatchCore macro pixel AUROC is 0.976323 and pixel AP is 0.542341. Its macro image precision is 0.951016, recall 0.956698, and false-positive rate 0.152242. The official test split contains 1,725 images, including 467 normal and 1,258 anomalous images. Macro metrics average category metrics equally and are not pooled confusion-matrix metrics. AUROC is not classification accuracy.
 
-Demo overrides are recorded with image hash, checkpoint identifier, scores and threshold. Do not silently fold test-set reviews into training or threshold selection. Reserve later development data and a new untouched test set for subsequent improvements.
+The high ranking performance does not eliminate false alarms. A threshold derived from normal validation images does not guarantee a 5% test false-positive rate under distribution shift. Do not improve the displayed F1 by tuning thresholds against test labels.
 
-## Results table (unmeasured)
+## Deployment package
 
-| Category | Method | AUROC | Precision | Recall | FPR | Mean ms | p95 ms |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| TBD | Autoencoder | — | — | — | — | — | — |
-| TBD | CNN | — | — | — | — | — | — |
-| TBD | Ensemble | — | — | — | — | — | — |
+The exporter reads already evaluated checkpoints, verifies local recovery checkpoints against saved stage SHA-256 receipts, and separates the identical frozen backbone from category-specific memory banks. It checks backbone tensor equality across all categories. Thresholds and preprocessing metadata are preserved. No training or recalibration happens during export or in the app.
 
-Synthetic smoke-test results must never replace the blank benchmark entries.
+The installer verifies the entire release ZIP; the inference loader checks the selected model and backbone hashes. Loading uses PyTorch `weights_only=True`, and the pretrained backbone constructor has downloads disabled. CPU and CUDA are supported. GPU availability is checked before CUDA selection.
+
+## Heatmaps and latency
+
+Anomaly maps are resized and overlaid on the input for human review. The display normalizes each map independently, so color intensity cannot be compared quantitatively across different images. The overlay is not a calibrated binary defect mask. Pixel AUROC/AP are reported from experimental maps; PRO is not implemented.
+
+Displayed inference time excludes loading a model, checksum verification, disk I/O, and rendering. The first inspection can therefore take longer than the displayed milliseconds. Performance depends on hardware and is not a production throughput guarantee.
+
+## Reproducibility limits
+
+The experiment ran on a Colab Tesla T4. Different PyTorch versions, CPU/GPU kernels, or hardware may cause small floating-point differences. Borderline scores near the threshold require review. Report the original protocol and software versions alongside comparisons; do not claim production reliability, universal category recognition, or published SOTA reproduction.

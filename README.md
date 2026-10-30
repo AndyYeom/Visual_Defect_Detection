@@ -1,140 +1,129 @@
-# Visual Defect Detection
+# InspectIQ — Visual Defect Detection
 
-**Visual Defect Detection Using Deep Learning and Ensemble Anomaly Scoring**
+**NUS-ISS · Pattern Recognition Systems Practice Module · Group 30**
 
-NUS-ISS Pattern Recognition Systems Practice Module · Group 30
+A runnable visual inspection application that detects unusual product appearance and highlights suspected defect regions. Upload an image, choose its product category, and inspect the **PatchCore** anomaly score, normal/abnormal decision, and heatmap. The application runs locally on CPU or NVIDIA CUDA GPU.
 
-Research prototype that learns normal product appearance, flags unusual images, and highlights suspected defect regions for human review. It compares a convolutional autoencoder, a pretrained CNN feature-distance baseline, and a weighted ensemble.
+## Team
 
-**Status: initial implementation, not a trained or validated inspection system.** The proposal leaves the dataset open. This scaffold supports MVTec AD-style folders and suggests MVTec AD as a first candidate, subject to the team's dataset review. No real-data results or trained weights are included.
+| Name | Student ID |
+|---|---|
+| Yeom Dongjun | A0354802H |
+| Zaiyu Zhang | A0357851U |
+| Worameth Wittanakorn | A0356365W |
+| Nguyen Tri Nghia | A0355672W |
 
-[Dataset plan](docs/DATASET.md) · [Evaluation protocol](docs/EVALUATION.md) · [Project plan](docs/PROJECT_PLAN.md)
+## Project and final approach
 
-## Scope
+Our proposal, **Visual Defect Detection Using Deep Learning and Ensemble Anomaly Scoring**, investigated normal-only industrial inspection using reconstruction and pretrained visual features. We implemented an autoencoder, a frozen CNN baseline, and score ensembles, then extended the comparison to PatchCore and a DINOv2-based anomaly detector.
 
-| Requirement | Implementation |
-| --- | --- |
-| Unsupervised learning | Fit normal training images only; normal validation calibrates scores |
-| Deep learning | Small convolutional autoencoder, reconstruction-error map |
-| Pretrained CNN | Frozen ImageNet ResNet18 through layer2, per-location diagonal feature distance |
-| Ensemble | Validation-standardized scores, fixed 50/50 weighted average |
-| Evaluation | AUROC, precision, recall, F1, false-positive rate, mean/p95 CPU latency |
-| Demo | Image upload, normal/anomalous result, score, relative heatmap, local review log |
+After evaluating six methods across all **15 MVTec AD categories**, we selected **PatchCore** for the final demo. It extracts patch features using a pretrained Wide ResNet-50-2, compares them with a coreset of normal training features, and produces image-level anomaly scores and spatial anomaly maps. Each category has its own memory bank and validation-calibrated threshold. No defect labels are used for training or threshold selection.
 
-This CNN baseline is deliberately simple and is **not** a reproduction of PatchCore or PaDiM. The heatmap supports inspection; pixel-level segmentation quality remains future work.
+The frontend and inference backend are delivered together in one Streamlit application. A separate web/API server is not required.
 
-```mermaid
-flowchart LR
-  A[Normal training images] --> B[Autoencoder]
-  A --> C[Frozen CNN feature statistics]
-  V[Normal validation images] --> D[Score calibration and thresholds]
-  B --> D
-  C --> D
-  I[Uploaded or test image] --> E[Two anomaly maps and scores]
-  B --> E
-  C --> E
-  E --> F[Standardize and combine]
-  D --> F
-  F --> G[Decision and heatmap]
-  G --> H[Human review]
-```
+## Quick start
 
-## Installation
-
-Use Python 3.11 or 3.12. The initial implementation runs on CPU, including on macOS, without a CUDA setup.
+Use **Python 3.12** and run these commands in a terminal:
 
 ```bash
 git clone https://github.com/AndyYeom/Visual_Defect_Detection.git
 cd Visual_Defect_Detection
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e '.[dev,demo]'
-```
-
-On Windows activate with `.venv\Scripts\activate`. The first real training run downloads official ImageNet ResNet18 weights through torchvision; inference uses weights stored in the checkpoint and needs no download. Dependency bounds are compatibility ranges, not an exact lock. Save `python -m pip freeze > artifacts/environment.txt` with each experiment.
-
-## Quick pipeline check without a dataset download
-
-```bash
-python scripts/make_synthetic_data.py
-vdd prepare --root data/synthetic --category synthetic --output artifacts/smoke-split.json
-vdd train --root data/synthetic --manifest artifacts/smoke-split.json --output artifacts/smoke --epochs 1 --size 32 --offline-smoke
-vdd evaluate --root data/synthetic --manifest artifacts/smoke-split.json --checkpoint artifacts/smoke/model.pt --output reports/smoke
-vdd predict --checkpoint artifacts/smoke/model.pt --image data/synthetic/synthetic/test/scratch/000.png --output reports/smoke-prediction
-```
-
-`--offline-smoke` uses **random CNN weights** exclusively for integration testing. Synthetic metrics are not evidence of defect-detection performance. The demo visibly warns when this model is loaded.
-
-## Real-data workflow
-
-Download an approved dataset from its original source and arrange one category as shown in [DATASET.md](docs/DATASET.md). This example uses the candidate category `bottle`; choosing it is not a final project decision.
-
-```bash
-vdd prepare --root data/mvtec_ad --category bottle --output artifacts/bottle-split.json
-vdd train --root data/mvtec_ad --manifest artifacts/bottle-split.json --output artifacts/bottle --epochs 10 --size 128
-vdd evaluate --root data/mvtec_ad --manifest artifacts/bottle-split.json --checkpoint artifacts/bottle/model.pt --output reports/bottle
-vdd predict --checkpoint artifacts/bottle/model.pt --image path/to/bottle.png --output reports/example
+python -m pip install -e '.[demo]'
+python scripts/download_models.py
 python -m streamlit run app/streamlit_app.py
 ```
 
-Enter `artifacts/bottle/model.pt` in the demo sidebar. A model applies to **one product category**. Train separate checkpoints for additional categories. The demo logs human reviews to `artifacts/demo/reviews.jsonl`; it does not retrain or change thresholds automatically.
+On Windows, create the environment with `py -3.12 -m venv .venv` and activate it using `.venv\Scripts\Activate.ps1` in PowerShell. The remaining `python` commands are the same.
 
-### Outputs
+Open **http://localhost:8501**. The model download is a one-time step; the app then works offline. No Colab, Google Drive login, full dataset, or retraining is needed for uploaded-image inference. Allow several GB of free disk space for Python packages and models. CPU is supported, including Mac; the app does not use Apple MPS.
 
-- `split.json`: relative paths, labels, seed, split assignments, SHA-256 image hashes.
-- `model.pt` and `training.json`: both models, fitted feature statistics, validation calibration, thresholds and training metadata.
-- `metrics.json` and `predictions.csv`: comparison of all three methods and per-image scores.
-- `overlay.png` and `prediction.json`: local prediction and relative heatmap.
-
-Image scores are the mean of the highest 1% of anomaly-map values. Validation means and standard deviations put both scores on comparable scales. The default threshold is the 95th percentile of normal validation scores for each method. This does not guarantee a 5% false-positive rate on unseen data, especially with small validation sets. Scores can be negative and are not probabilities.
-
-## Repository layout
-
-```text
-app/                    Streamlit local demonstration
-src/vdd/                Data, models, scoring, training, inference, CLI
-scripts/                Synthetic smoke-test dataset generator
-tests/                  Split integrity, calibration, end-to-end tests
-configs/                Baseline settings reference
-docs/                   Dataset, evaluation, architecture, project and report plans
-.github/                CI, issue and PR templates
-data/                   Local datasets (ignored)
-artifacts/              Local manifests, checkpoints, logs (ignored)
-reports/                Local evaluation output (ignored)
-```
-
-## Checks
-
-See [initial validation record](docs/VALIDATION.md) for the checks actually completed and remaining validation.
+If the automatic model download is blocked, download `patchcore-models-v1.zip` from [Releases](https://github.com/AndyYeom/Visual_Defect_Detection/releases), then run:
 
 ```bash
-ruff check .
-pytest -q
+python scripts/download_models.py --archive /path/to/patchcore-models-v1.zip
 ```
 
-CI runs an offline synthetic end-to-end test, so it does not need dataset access or pretrained weight downloads. Real pretrained-model training and benchmark quality must be evaluated separately. Tests reject duplicate images across splits, altered files, non-normal training/validation labels, and mismatched evaluation manifests.
+The installer verifies the release checksum and model checksums. Do not rename or mix model files from different runs.
 
-## Limitations and next steps
+### NVIDIA GPU
 
-1. Agree on the dataset, permitted use and product categories; review the split manifest.
-2. Establish real-data baselines before changing architectures or hyperparameters.
-3. Inspect missed defects and false alarms. Record conditions under which the ensemble underperforms.
-4. Add pixel-level mask evaluation, multi-seed experiments and controlled robustness tests if time allows.
-5. Finish the report, slides and demo video using measured results.
+Install a CUDA-enabled PyTorch/torchvision pair suitable for your system using the [official PyTorch installer](https://pytorch.org/get-started/locally/) before installing this project. Select **Automatic** or **NVIDIA GPU** in the app. Automatic uses CUDA when available, otherwise CPU. A GPU improves speed but is not required for the demo.
 
-The CNN distance assumes spatial alignment and independent feature channels. Reconstruction error can miss well-reconstructed anomalies. The 128×128 default may erase small defects. Heatmaps are per-image visual explanations, not calibrated segmentation or defect-type labels. This local demo has no multi-user persistence or production authentication.
+## Demonstration workflow
 
-## Team and provenance
+1. Select a **Product category**, for example Bottle.
+2. Upload a PNG or JPEG of that product (up to 20 MB / 25 million pixels).
+3. Click **Run inspection**. The first inspection includes model loading; subsequent inspections reuse the loaded model.
+4. Review the verdict, anomaly score, decision threshold, inference time, original image, and heatmap overlay.
+5. Download the inspection JSON and overlay PNG for your presentation.
 
-Yeom Dongjun, Zaiyu Zhang, Worameth Wittanakorn, Nguyen Tri Nghia. Source scope: Group 30 proposal and presentation dated 30 September 2026. Planned completion in those materials: **31 October 2026**. Student IDs and original Office documents are intentionally excluded.
+The score is **not a probability**. Red indicates relatively unusual regions within that image; heatmap colors are normalized for display and are not a calibrated segmentation mask. The category must match the uploaded object. A bottle model cannot reliably inspect an unrelated object or an arbitrary photograph.
 
-The implementation choices (ResNet18, diagonal statistics, score pooling, split fraction, default thresholds and Streamlit) are draft engineering decisions, not claims that the original proposal specified them. See [PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
+If MVTec AD is already installed locally, enable the optional example selector:
 
-## References and usage
+```bash
+VDD_DATA_ROOT=/path/to/mvtec_anomaly_detection python -m streamlit run app/streamlit_app.py
+```
 
-- [MVTec AD official dataset](https://www.mvtec.com/research-teaching/datasets/mvtec-ad)
-- [MVTec AD paper, CVPR 2019](https://openaccess.thecvf.com/content_CVPR_2019/html/Bergmann_MVTec_AD_--_A_Comprehensive_Real-World_Dataset_for_Unsupervised_Anomaly_CVPR_2019_paper.html)
-- [Torchvision ResNet18 documentation](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.resnet18.html)
+The data directory should contain `bottle/train/good`, `bottle/test`, etc. Example images stay on your machine and are not bundled in this repository. For a short presentation, demonstrate one normal and one defective image from the same category, explain the score/threshold, then show the method comparison below.
 
-Dataset and pretrained-weight terms remain with their respective providers. No software licence has been selected for this team draft; agree on licensing before external redistribution. Do not commit raw datasets, trained weights, credentials or identifying student records.
+![Demo inspection screen](docs/demo.png)
+
+## Experimental results
+
+Results are **macro averages across 15 categories**, from the completed `full15_224_v1` experiment:
+
+| Method | Image AUROC | F1 |
+|---|---:|---:|
+| Autoencoder | 0.5781 | 0.2715 |
+| Frozen CNN baseline | 0.8588 | 0.7027 |
+| AE + CNN ensemble | 0.8197 | 0.6818 |
+| **PatchCore — selected** | **0.9840** | **0.9514** |
+| DINOv2-based anomaly detector | 0.9679 | 0.9258 |
+| AE + DINO ensemble | 0.9464 | 0.9091 |
+
+PatchCore pixel AUROC: **0.9763**; pixel average precision: **0.5423**. Category-average image precision: **0.9510**, recall: **0.9567**, false-positive rate: **0.1522**. AUROC 0.9840 is a ranking metric, **not 98.4% classification accuracy**.
+
+Protocol: 224 × 224 inputs; normal training images split 80/20 for training/validation with seed 42; thresholds fixed at the normal validation 95th percentile; official test split used only for evaluation. PatchCore uses layers 2 and 3 of Wide ResNet-50-2, 1% coreset sampling, and 9 neighbors. Baseline autoencoder training used 10 epochs and batch size 16. Ensembles use fixed 50/50 scores after normal-validation calibration. See [evaluation details](docs/EVALUATION.md) and the exported experiment summary in the model package.
+
+These are our adapted experimental implementations, not claims to reproduce published SOTA numbers. The DINO baseline uses DINOv2 ViT-S/14 without foreground masking or rotation augmentation. False positives remain substantial in some categories; deployment on new cameras, lighting, or products requires representative validation and human review. Test labels must not be used to tune the demo threshold.
+
+![Macro image AUROC comparison](docs/results/image_auroc.png)
+
+## Repository contents
+
+- `app/streamlit_app.py`: interactive inspection UI.
+- `src/vdd/patchcore_inference.py`: checksum-verified offline model loading and inference.
+- `src/vdd/benchmark.py`: PatchCore/DINO feature experiments.
+- `src/vdd/pipeline.py`: autoencoder, CNN, and ensemble baseline pipeline.
+- `src/vdd/suite.py`: resumable category experiment runner.
+- `notebooks/`: Colab workflows and analysis scripts.
+- `scripts/download_models.py`: install the versioned release models.
+- `scripts/export_patchcore.py`: package already evaluated models with a shared backbone.
+- `tests/`: data/protocol, GPU selection, suite, and deployment checks.
+- `artifacts/patchcore/`: downloaded models and evaluation exports (excluded from Git).
+
+Large weights are distributed as a release asset rather than committed to Git. MVTec AD is not redistributed. Obtain the dataset from its official provider and follow its license. The release package includes pretrained backbone weights and category memory banks; this is an academic research demo, not a certified industrial inspection system.
+
+## Development and reproduction
+
+```bash
+python -m pip install -e '.[demo,dev]'
+python -m pytest
+python -m vdd.cli --help
+python -m vdd.benchmark --help
+python -m vdd.suite --help
+```
+
+Training requires downloading pretrained feature extractors on first use. The released demo models do not. Existing run directories are retained for traceability; do not combine incompatible experiment protocols when resuming.
+
+## References and attribution
+
+- Roth et al., *Towards Total Recall in Industrial Anomaly Detection*, CVPR 2022 — [PatchCore paper and authors' implementation](https://github.com/amazon-science/patchcore-inspection).
+- Bergmann et al., *MVTec AD — A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection*, CVPR 2019 — [official dataset](https://www.mvtec.com/company/research/datasets/mvtec-ad).
+- [Anomalib](https://github.com/open-edge-platform/anomalib): PatchCore model implementation used in this project (version 2.7.0).
+- [DINOv2](https://github.com/facebookresearch/dinov2): pretrained visual representation used for the DINO comparison.
+- [PyTorch](https://pytorch.org/) and [Streamlit](https://streamlit.io/): model inference and interactive application.

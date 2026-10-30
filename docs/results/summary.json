@@ -1,0 +1,91 @@
+{
+  "complete_categories": [
+    "bottle",
+    "cable",
+    "capsule",
+    "carpet",
+    "grid",
+    "hazelnut",
+    "leather",
+    "metal_nut",
+    "pill",
+    "screw",
+    "tile",
+    "toothbrush",
+    "transistor",
+    "wood",
+    "zipper"
+  ],
+  "expected_categories": [
+    "bottle",
+    "cable",
+    "capsule",
+    "carpet",
+    "grid",
+    "hazelnut",
+    "leather",
+    "metal_nut",
+    "pill",
+    "screw",
+    "tile",
+    "toothbrush",
+    "transistor",
+    "wood",
+    "zipper"
+  ],
+  "aggregation": "Unweighted category macro mean; missing categories are never zero-filled",
+  "metrics": {
+    "autoencoder": {
+      "categories": 15,
+      "auroc": 0.5781161787669012,
+      "f1": 0.2715195359180062,
+      "precision": 0.7365535444947209,
+      "recall": 0.18098235825833772,
+      "false_positive_rate": 0.049739042486464505
+    },
+    "cnn": {
+      "categories": 15,
+      "auroc": 0.8587737499695545,
+      "f1": 0.7027498703350686,
+      "precision": 0.9138439837175997,
+      "recall": 0.6246245672661247,
+      "false_positive_rate": 0.1360700179041169
+    },
+    "ensemble": {
+      "categories": 15,
+      "auroc": 0.8196975808324856,
+      "f1": 0.6818463935778443,
+      "precision": 0.9105899563650055,
+      "recall": 0.6059224666544613,
+      "false_positive_rate": 0.12876139690327912
+    },
+    "patchcore": {
+      "categories": 15,
+      "auroc": 0.9839512161114322,
+      "f1": 0.9514293183290209,
+      "precision": 0.951016451555174,
+      "recall": 0.9566984749743127,
+      "false_positive_rate": 0.15224166984359094,
+      "pixel_auroc": 0.9763229166787057,
+      "pixel_ap": 0.5423414163765657
+    },
+    "anomalydino": {
+      "categories": 15,
+      "auroc": 0.967892217922421,
+      "f1": 0.9257869627268462,
+      "precision": 0.932319688213209,
+      "recall": 0.9303793265576743,
+      "false_positive_rate": 0.1480102776857352,
+      "pixel_auroc": 0.9632591049130311,
+      "pixel_ap": 0.5021194673835804
+    },
+    "ae_anomalydino": {
+      "categories": 15,
+      "auroc": 0.9464338901067836,
+      "f1": 0.9091415618627823,
+      "precision": 0.9534630015031779,
+      "recall": 0.8844650292968107,
+      "false_positive_rate": 0.09424381714568697
+    }
+  }
+}

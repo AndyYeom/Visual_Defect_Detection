@@ -7,5 +7,5 @@
   "validation_fraction": 0.2,
   "autoencoder_weight": 0.5,
   "normal_threshold_quantile": 0.95,
-  "device": "cpu"
+  "device": "auto"
 }

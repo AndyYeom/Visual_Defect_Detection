@@ -41,6 +41,8 @@ def main():
     predict.add_argument("--image", required=True)
     predict.add_argument("--checkpoint", default="artifacts/baseline/model.pt")
     predict.add_argument("--output", default="reports/prediction")
+    for command in (fit, test, predict):
+        command.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
     args = parser.parse_args()
     if args.command == "prepare":
         result = make_manifest(
@@ -59,14 +61,15 @@ def main():
             args.weight,
             args.quantile,
             not args.offline_smoke,
+            device=args.device,
         )
         print(json.dumps(result, indent=2))
     elif args.command == "evaluate":
         print(
-            json.dumps(evaluate(args.root, args.manifest, args.checkpoint, args.output), indent=2)
+            json.dumps(evaluate(args.root, args.manifest, args.checkpoint, args.output, device=args.device), indent=2)
         )
     else:
-        detector = Detector(args.checkpoint)
+        detector = Detector(args.checkpoint, device=args.device)
         with Image.open(args.image) as image:
             result = detector.predict(image)
             output = Path(args.output)

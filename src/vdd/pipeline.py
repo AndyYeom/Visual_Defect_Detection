@@ -1,4 +1,4 @@
-"""CPU-first reproducible baseline training, inference, and hold-out evaluation."""
+"""Device-aware reproducible baseline training, inference, and hold-out evaluation."""
 
 import csv
 import hashlib
@@ -13,6 +13,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 from .data import ImageDataset, load_manifest, transform
+from .device import device_name, resolve_device, synchronize
 from .models import Autoencoder, FeatureModel, anomaly_maps, image_score
 from .scoring import calibrate, combine, metrics
 
@@ -28,10 +29,12 @@ def train(
     weight=0.5,
     quantile=0.95,
     pretrained=True,
+    device="auto",
 ):
     if epochs < 1 or batch_size < 1:
         raise ValueError("epochs and batch_size must be positive.")
     transform(size)
+    device = resolve_device(device)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -43,13 +46,14 @@ def train(
         return DataLoader(ImageDataset(root, records, size), batch_size=batch_size, shuffle=shuffle)
 
     train_loader, val_loader = loader("train", True), loader("val")
-    ae, cnn = Autoencoder(), FeatureModel(pretrained=pretrained)
+    ae, cnn = Autoencoder().to(device), FeatureModel(pretrained=pretrained).to(device)
     optimizer = torch.optim.Adam(ae.parameters(), lr=1e-3)
     history = []
     for epoch in range(epochs):
         ae.train()
         total, count = 0.0, 0
         for x, _, _ in train_loader:
+            x = x.to(device)
             optimizer.zero_grad()
             loss = (ae(x) - x).square().mean()
             loss.backward()
@@ -61,17 +65,19 @@ def train(
     with torch.inference_mode():
         total, square, count = None, None, 0
         for x, _, _ in train_loader:
-            features = cnn(x).double()
+            # Accumulate on CPU in float64: MPS does not support float64.
+            features = cnn(x.to(device)).cpu().double()
             s, ss = features.sum(0, keepdim=True), features.square().sum(0, keepdim=True)
             total = s if total is None else total + s
             square = ss if square is None else square + ss
             count += len(x)
         mean = total / count
         variance = (square / count - mean.square()).clamp_min(1e-4).float()
-        mean = mean.float()
+        mean = mean.float().to(device)
+        variance = variance.to(device)
         scores = []
         for x, _, _ in val_loader:
-            maps = anomaly_maps(ae, cnn, x, mean, variance)
+            maps = anomaly_maps(ae, cnn, x.to(device), mean, variance)
             scores.extend(torch.stack([image_score(m) for m in maps], 1).tolist())
     calibration = calibrate(scores, weight, quantile)
     output = Path(output)
@@ -87,14 +93,16 @@ def train(
         "calibration": calibration,
         "manifest_sha256": hashlib.sha256(Path(manifest_path).read_bytes()).hexdigest(),
         "torch_version": str(torch.__version__),
+        "device": str(device),
+        "device_name": device_name(device),
         "history": history,
     }
     torch.save(
         {
-            "ae": ae.state_dict(),
-            "cnn": cnn.state_dict(),
-            "mean": mean,
-            "variance": variance,
+            "ae": {k: v.cpu() for k, v in ae.state_dict().items()},
+            "cnn": {k: v.cpu() for k, v in cnn.state_dict().items()},
+            "mean": mean.cpu(),
+            "variance": variance.cpu(),
             "metadata": metadata,
         },
         output / "model.pt",
@@ -104,23 +112,30 @@ def train(
 
 
 class Detector:
-    def __init__(self, checkpoint):
+    def __init__(self, checkpoint, device="auto"):
+        self.device = resolve_device(device)
         torch.set_num_threads(2)
         state = torch.load(checkpoint, map_location="cpu", weights_only=True)
         self.metadata = state["metadata"]
         self.ae, self.cnn = Autoencoder().eval(), FeatureModel(pretrained=False)
         self.ae.load_state_dict(state["ae"])
         self.cnn.load_state_dict(state["cnn"])
-        self.mean, self.variance = state["mean"], state["variance"]
+        self.ae.to(self.device)
+        self.cnn.to(self.device)
+        self.mean = state["mean"].to(self.device)
+        self.variance = state["variance"].to(self.device)
         self.transform = transform(self.metadata["size"])
 
     @torch.inference_mode()
     def predict(self, image):
+        synchronize(self.device)
         start = time.perf_counter()
-        x = self.transform(image.convert("RGB"))[None]
+        x = self.transform(image.convert("RGB"))[None].to(self.device)
+        synchronize(self.device)
         t0 = time.perf_counter()
         ae_map = (self.ae(x) - x).square().mean(1)
         ae_raw = image_score(ae_map).item()
+        synchronize(self.device)
         t1 = time.perf_counter()
         from torch.nn import functional as F
 
@@ -129,6 +144,7 @@ class Detector:
             fmap[:, None], size=x.shape[-2:], mode="bilinear", align_corners=False
         )[:, 0]
         cnn_raw = image_score(cnn_map).item()
+        synchronize(self.device)
         t2 = time.perf_counter()
         calibration = self.metadata["calibration"]
         scores = combine([[ae_raw, cnn_raw]], calibration)[0]
@@ -136,8 +152,8 @@ class Detector:
         # This heatmap is not a calibrated pixel-level classifier.
         w = calibration["weight"]
         heatmap = (
-            w * (ae_map[0].numpy() - calibration["center"][0]) / calibration["scale"][0]
-            + (1 - w) * (cnn_map[0].numpy() - calibration["center"][1]) / calibration["scale"][1]
+            w * (ae_map[0].cpu().numpy() - calibration["center"][0]) / calibration["scale"][0]
+            + (1 - w) * (cnn_map[0].cpu().numpy() - calibration["center"][1]) / calibration["scale"][1]
         )
         end = time.perf_counter()
         return {
@@ -153,9 +169,9 @@ class Detector:
         }
 
 
-def evaluate(root, manifest_path, checkpoint, output):
+def evaluate(root, manifest_path, checkpoint, output, device="auto"):
     manifest = load_manifest(manifest_path, root)
-    detector = Detector(checkpoint)
+    detector = Detector(checkpoint, device=device)
     manifest_hash = hashlib.sha256(Path(manifest_path).read_bytes()).hexdigest()
     if manifest_hash != detector.metadata["manifest_sha256"]:
         raise ValueError("Evaluation manifest differs from the training manifest.")
@@ -195,10 +211,11 @@ def evaluate(root, manifest_path, checkpoint, output):
     report = {
         "category": manifest["category"],
         "pretrained": detector.metadata["pretrained"],
-        "device": "cpu",
+        "device": str(detector.device),
+        "device_name": device_name(detector.device),
         "warmup_images": 1,
         "metrics": results,
-        "timing_scope": "AE/CNN include scoring; ensemble includes resize, both models and fusion; excludes disk I/O.",
+        "timing_scope": "AE/CNN include scoring; ensemble includes resize, device transfers, both models and fusion; excludes disk I/O.",
     }
     (output / "metrics.json").write_text(json.dumps(report, indent=2, allow_nan=False))
     return report
