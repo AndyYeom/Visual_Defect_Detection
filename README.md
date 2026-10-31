@@ -1,19 +1,45 @@
-# InspectIQ — AI Visual Defect Detection
+# InspectIQ
 
-**NUS-ISS · Pattern Recognition Systems Practice Module · Group 30**
+## Project Title
 
-A runnable visual inspection application that detects unusual product appearance and highlights suspected defect regions. Upload an image, choose its product category, and inspect the **PatchCore** anomaly score, normal/abnormal decision, and heatmap. The application runs locally on CPU or NVIDIA CUDA GPU.
+InspectIQ: AI Visual Defect Detection Using Deep Learning and Ensemble Anomaly Scoring
 
-## Team
+**Group 30 — NUS-ISS Pattern Recognition Systems Practice Module**
 
-| Name | Student ID |
-|---|---|
-| Yeom Dongjun | A0354802H |
-| Zaiyu Zhang | A0357851U |
-| Worameth Wittanakorn | A0356365W |
-| Nguyen Tri Nghia | A0355672W |
+## Executive Summary / Paper Abstract
 
-## Project and final approach
+InspectIQ investigates normal-only visual defect detection for industrial inspection. The project compares six methods across all 15 categories of the MVTec AD dataset: a convolutional autoencoder, a frozen CNN feature baseline, an AE + CNN ensemble, PatchCore, a DINOv2-based anomaly detector, and an AE + DINO ensemble. All methods use the same category splits and a fixed 224 × 224 evaluation protocol. Decision thresholds are calibrated using normal validation images.
+
+PatchCore achieved the strongest result in this comparison, with a macro image AUROC of 0.9840 and macro F1 of 0.9514. Equal-weight score fusion did not improve AUROC over the stronger feature-based component. These findings motivated the selection of PatchCore for the final inspection application. AUROC measures ranking quality, not classification accuracy; these adapted, single-seed experiments are not an exact reproduction of published SOTA results.
+
+The final application combines a Streamlit interface with a local inference backend. Users select a product category, inspect an uploaded image, review an anomaly score and heatmap, and export the inspection result. Packaged models support CPU or NVIDIA CUDA inference and work offline after downloading. The project demonstrates an evaluated academic prototype; benchmark performance does not establish production reliability under new cameras, lighting or product conditions.
+
+## Credits / Project Contribution
+
+| Official Full Name | Student ID (MTech Applicable) | Work Items (Who Did What) |
+| --- | --- | --- |
+| Yeom Dongjun | A0354802H | Led the overall implementation and system integration, coordinated GPU experiment execution and the six-method comparison across all 15 MVTec AD categories, and developed the Streamlit inspection interface. Integrated the selected PatchCore model into the application and coordinated end-to-end demonstration testing. |
+| Nguyen Tri Nghia | A0355672W | Managed model packaging and deployment preparation, verified model loading and inference behaviour, and maintained execution instructions and release documentation. Conducted false-positive and false-negative analysis, reviewed anomaly heatmaps, and assessed technical limitations and improvement opportunities. |
+| Zaiyu Zhang | A0357851U | Reviewed related research and anomaly detection techniques, contributed to experimental design and the evaluation protocol, and analysed model and ensemble performance. Supported the interpretation of evaluation metrics and the rationale for selecting the final model. |
+| Worameth Wittanakorn | A0356365W | Researched and documented the MVTec AD dataset, contributed to data preparation and split validation, and reviewed category coverage and normal/defective image characteristics. Organised representative examples and checked the consistency of dataset descriptions and visual materials. |
+
+**Shared contribution:** All four members participated in researching datasets and reference materials, reviewing code and experimental findings, and discussing implementation decisions. The allocation identifies primary responsibilities rather than exclusive ownership.
+
+## System Documentation and User Guide
+
+InspectIQ connects normal-only model evaluation with a runnable product inspection workflow. Its interface and inference backend run together in one local Streamlit application; a separate API server is not required.
+
+See the [architecture](docs/ARCHITECTURE.md), [dataset description](docs/DATASET.md), [evaluation protocol](docs/EVALUATION.md), and [experiment reproduction guide](docs/REPRODUCIBILITY.md) for technical details.
+
+## Key capabilities
+
+- **Category-specific inspection.** Select one of 15 product categories and apply its saved normal-feature memory bank and threshold.
+- **Visual defect review.** Compare the original image with an anomaly heatmap and review the score, verdict and inference time.
+- **Exportable results.** Download the inspection report as JSON and the overlay as a PNG.
+- **Offline inference.** Use checksum-verified released models on CPU or NVIDIA CUDA after the initial download.
+- **Reproducible comparisons.** Run six methods with shared splits, validation-based calibration, saved artifacts and verified stage-level resume.
+
+## Current implementation and limits
 
 Our proposal, **Visual Defect Detection Using Deep Learning and Ensemble Anomaly Scoring**, investigated normal-only industrial inspection using reconstruction and pretrained visual features. We implemented an autoencoder, a frozen CNN baseline, and score ensembles, then extended the comparison to PatchCore and a DINOv2-based anomaly detector.
 
@@ -21,29 +47,11 @@ After evaluating six methods across all **15 MVTec AD categories**, we selected 
 
 The frontend and inference backend are delivered together in one Streamlit application. A separate web/API server is not required.
 
-## Our contributions
+The implementation uses established research methods. Our project contribution is their comparative evaluation, failure analysis, model packaging and integration into an inspection application. We do not claim to have invented PatchCore or DINOv2.
 
-Our contribution is the implementation and evaluation of an inspection workflow using established research methods:
+## Run
 
-- A shared normal-only split and calibration protocol for six methods across 15 categories.
-- Category-level and macro performance comparisons, pixel metrics and explicit failure analysis.
-- Evidence-based selection of PatchCore rather than assuming score ensembles improve performance.
-- A checksum-verified model package and an offline-capable Streamlit application with downloadable inspection results.
-- A reproducible experiment runner with saved manifests, logs and verified stage-level resume.
-
-We do not claim to have invented PatchCore or DINOv2, or to reproduce published SOTA scores exactly.
-
-## Final deliverables
-
-- [Final report (Word)](submission/InspectIQ-Final-Report.docx)
-- [Submission presentation (PowerPoint, no speaker notes)](submission/InspectIQ-Final-Presentation.pptx)
-- [Measured results and evaluation protocol](docs/EVALUATION.md)
-- [Runnable demo models](https://github.com/AndyYeom/Visual_Defect_Detection/releases)
-- [Full experiment reproduction instructions](docs/REPRODUCIBILITY.md)
-
-The live demonstration is launched with the quick start below. A recorded demo video is not included in this repository.
-
-## Quick start
+### Prerequisites and installation
 
 Use **Python 3.12** and run these commands in a terminal:
 
@@ -74,7 +82,22 @@ The installer verifies the release checksum and model checksums. Do not rename o
 
 Install a CUDA-enabled PyTorch/torchvision pair suitable for your system using the [official PyTorch installer](https://pytorch.org/get-started/locally/) before installing this project. Select **Automatic** or **NVIDIA GPU** in the app. Automatic uses CUDA when available, otherwise CPU. A GPU improves speed but is not required for the demo.
 
-## Demonstration workflow
+### Troubleshooting project imports
+
+If the app reports `No module named 'vdd'`, stop the server, activate the intended environment, and reinstall the project from the repository root with `python -m pip install -e '.[demo]'`. Then launch it with the same `python` executable. If the local environment still omits the editable source path, use this explicit path for the current terminal session:
+
+```bash
+# macOS / Linux, from the repository root
+PYTHONPATH="$PWD/src" python -m streamlit run app/streamlit_app.py
+```
+
+```powershell
+# Windows PowerShell, from the repository root
+$env:PYTHONPATH = Join-Path (Get-Location) 'src'
+python -m streamlit run app/streamlit_app.py
+```
+
+## First-use workflow
 
 1. Select a **Product category**, for example Bottle.
 2. Upload a PNG or JPEG of that product (up to 20 MB / 25 million pixels).
@@ -95,6 +118,16 @@ The data directory should contain `bottle/train/good`, `bottle/test`, etc. Examp
 ![Demo inspection screen](docs/demo.png)
 
 ![Anomaly localization result](docs/result.png)
+
+### Presentation examples: normal first, defective second
+
+With the local example selector enabled, select **Bottle**, then:
+
+1. Choose `test/good/000.png`, click **Use this example**, then **Run inspection**. The recorded score is approximately **27.82**, below the fixed threshold of **31.99**.
+2. Choose `test/broken_large/000.png`, click **Use this example** again, then **Run inspection**. The recorded score is approximately **61.54**, above the same threshold.
+3. Compare the original image with the heatmap and show the JSON/PNG download controls.
+
+These scores belong to those specific images and the released model. Other images have different scores, and minor device differences are possible. Load the model once before presenting to avoid including first-load overhead in the demonstration.
 
 ## Experimental results
 
@@ -123,6 +156,16 @@ PatchCore achieved the highest macro image AUROC and F1 in our comparison. Fixed
 
 The selected model still produced 59 false alarms and 73 missed defects across the pooled test set. Capsule, pill and screw accounted for 65 of those misses. These pooled counts complement the category-averaged metrics above. The demo therefore supports inspection and human review, rather than guaranteeing defect-free production.
 
+## Final deliverables
+
+- [Final report (Word)](submission/InspectIQ-Final-Report.docx)
+- [Submission presentation (PowerPoint, no speaker notes)](submission/InspectIQ-Final-Presentation.pptx)
+- [Measured results and evaluation protocol](docs/EVALUATION.md)
+- [Runnable demo models](https://github.com/AndyYeom/Visual_Defect_Detection/releases)
+- [Full experiment reproduction instructions](docs/REPRODUCIBILITY.md)
+
+The live demonstration is launched with the quick start below. A recorded demo video is not included in this repository.
+
 ## Repository contents
 
 - `app/streamlit_app.py`: interactive inspection UI.
@@ -138,10 +181,11 @@ The selected model still produced 59 false alarms and 73 missed defects across t
 
 Large weights are distributed as a release asset rather than committed to Git. MVTec AD is not redistributed. Obtain the dataset from its official provider and follow its license. The release package includes pretrained backbone weights and category memory banks; this is an academic research demo, not a certified industrial inspection system.
 
-## Development and reproduction
+## Verify and reproduce
 
 ```bash
 python -m pip install -e '.[demo,dev]'
+python -m ruff check .
 python -m pytest
 python -m vdd.cli --help
 python -m vdd.benchmark --help
